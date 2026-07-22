@@ -2,6 +2,10 @@ package com.example.douyinautoswiper;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.Context;
 import android.graphics.Path;
 import android.os.Build;
 import android.os.Handler;
@@ -14,36 +18,43 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 抖音极速版自动刷服务。
+ * 抖音极速版自动刷服务（v2）。
  *
- * 工作方式：
- *  - 通过系统无障碍服务拿到抖音极速版窗口内容；
- *  - 轮询检测视频进度文本（形如 "0:15/0:30"），进度≥95% 视为播完，立即上滑；
- *  - 读不到进度时，按「基础间隔 + 随机抖动」兜底定时上滑；
- *  - 每次上滑之间有最小节流间隔，避免手势重叠 / 切换过快。
+ * 关键修正（相对 v1）：
+ *  - 激活判断改用 onAccessibilityEvent 的「事件包名」，不再依赖
+ *    getRootInActiveWindow()（v1 因 canRetrieveWindowContent 未开启导致
+ *    getRootInActiveWindow 返回 null，整个轮询空转、一次都不滑）。
+ *  - 定时滑动保证「必跑」：只要处于抖音窗口且开关开启，到时间就一定上滑，
+ *    不依赖进度文本是否可读。
+ *  - 进度检测降级为「增强项」：能读到进度文本就「播完即切」，读不到就走定时。
+ *  - 状态栏通知：实时显示「已滑动 N 次 / 原因 / 当前进度」，便于排查。
  *
- * 注意：抖音极速版不会对外暴露"播完"回调，进度文本是否可读取依赖其版本实现，
- * 因此定时兜底是必要的保底策略。
+ * 关于「播完即切」的边界：抖音播放页进度条多为自定义 View，无障碍 often
+ * 读不到文本，因此纯无障碍方案下「精确播完即切」不可靠。本服务以定时滑动
+ * 为主，进度检测为辅。若你手机上抖音确实暴露了 "0:15/0:30" 类文本则会更准。
  */
 public class AutoSwipeService extends AccessibilityService {
 
-    private static final String TAG = "AutoSwipeService";
+    private static final String TAG = "AutoSwipe";
 
-    /** 监听的包名：抖音极速版。普通版请改成 com.ss.android.ugc.aweme（见 README）。 */
+    /** 抖音极速版包名。普通版抖音请改成 com.ss.android.ugc.aweme（见 README）。 */
     private static final String TARGET_PACKAGE = "com.ss.android.ugc.aweme.lite";
 
-    /** 轮询间隔（毫秒）。用于检查进度与定时兜底。 */
+    /** 轮询间隔（毫秒）。 */
     private static final long POLL_MS = 1000;
 
-    /** 两次上滑之间的最小间隔（毫秒），防止手势重叠。 */
+    /** 两次上滑最小间隔（毫秒），防止手势重叠 / 切换过快。 */
     private static final long MIN_SWIPE_INTERVAL_MS = 2500;
 
-    /** 进度达到该比例即视为"播完"，立即上滑。 */
+    /** 进度达到该比例即视为「播完」，立即上滑。 */
     private static final float DONE_THRESHOLD = 0.95f;
 
-    /** 匹配 "0:15/0:30" 形式的进度文本。 */
+    /** 匹配 "0:15/0:30" 或 "00:15/00:30" 形式的进度文本。 */
     private static final Pattern PROGRESS_PATTERN =
             Pattern.compile("(\\d{1,2}:\\d{2})\\s*/\\s*(\\d{1,2}:\\d{2})");
+
+    private static final String CHANNEL_ID = "douyin_autoswiper_channel";
+    private static final int NOTIF_ID = 1001;
 
     private Handler handler;
     private Runnable pollRunnable;
@@ -51,33 +62,43 @@ public class AutoSwipeService extends AccessibilityService {
     /** 下一次定时兜底上滑的目标时间戳。 */
     private long nextSwipeAfter = 0;
 
+    /** 当前是否处于抖音极速版窗口（由事件包名推断，不依赖 root）。 */
+    private boolean targetActive = false;
+
+    private int swipeCount = 0;
+    private NotificationManager nm;
+
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
         handler = new Handler(Looper.getMainLooper());
+        nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        createChannel();
         nextSwipeAfter = System.currentTimeMillis() + computeDelay();
         startLoop();
+        postNotify("服务已连接，等待抖音窗口");
         Log.d(TAG, "service connected");
     }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (!AppPreferences.isAutoSwipeEnabled(this)) return;
-        if (event.getPackageName() == null) return;
-        // 只处理目标包，其余忽略（服务在 manifest 中也已限制，双重保险）。
-        if (!TARGET_PACKAGE.equals(event.getPackageName().toString())) return;
-        // 实际滑动逻辑在轮询中统一处理，这里仅确认事件可达。
+        CharSequence pkg = event.getPackageName();
+        if (pkg == null) return;
+        String p = pkg.toString();
+        // 只在「窗口状态/内容变化」时更新激活状态（避免滚动事件频繁抖动）。
+        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                || event.getEventType() == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+            targetActive = TARGET_PACKAGE.equals(p);
+        }
+        // 实际滑动在轮询中统一处理，这里仅维护 targetActive 标志。
     }
 
-    /** 启动轮询循环：每隔 POLL_MS 检查一次是否需要滑动。 */
+    /** 启动轮询循环。 */
     private void startLoop() {
         pollRunnable = new Runnable() {
             @Override
             public void run() {
-                if (AppPreferences.isAutoSwipeEnabled(AutoSwipeService.this)
-                        && TARGET_PACKAGE.equals(getCurrentPackage())) {
-                    tick();
-                }
+                tick();
                 if (handler != null) {
                     handler.postDelayed(this, POLL_MS);
                 }
@@ -86,29 +107,44 @@ public class AutoSwipeService extends AccessibilityService {
         handler.postDelayed(pollRunnable, POLL_MS);
     }
 
-    private String getCurrentPackage() {
-        AccessibilityNodeInfo root = getRootInActiveWindow();
-        if (root == null) return null;
-        CharSequence pkg = root.getPackageName();
-        root.recycle();
-        return pkg == null ? null : pkg.toString();
-    }
-
-    /** 一次轮询：决定本 tick 是否上滑。 */
+    /** 一次轮询：决定是否上滑。 */
     private void tick() {
-        long now = System.currentTimeMillis();
+        if (!AppPreferences.isAutoSwipeEnabled(this)) {
+            postNotify("已停止：App 内开关已关闭");
+            return;
+        }
+        if (!targetActive) {
+            postNotify("未在抖音极速版（请在抖音播放页）");
+            return;
+        }
 
+        long now = System.currentTimeMillis();
         float progress = detectProgress();
         boolean progressDone = progress >= DONE_THRESHOLD;
         boolean timeUp = now >= nextSwipeAfter;
-
         boolean canSwipe = (now - lastSwipeTime) >= MIN_SWIPE_INTERVAL_MS;
 
         if (canSwipe && (progressDone || timeUp)) {
-            if (performSwipeUp()) {
+            boolean ok = performSwipeUp();
+            if (ok) {
+                swipeCount++;
                 lastSwipeTime = now;
-                // 滑动成功后，重新计算带随机抖动的兜底间隔。
                 nextSwipeAfter = now + computeDelay();
+                String reason = progressDone ? "进度满" : "定时";
+                postNotify("已滑动 " + swipeCount + " 次（" + reason + "）");
+                Log.d(TAG, "swipe #" + swipeCount + " reason=" + reason);
+            } else {
+                postNotify("手势失败：请确认系统无障碍已启用本服务");
+                Log.e(TAG, "dispatchGesture returned false");
+            }
+        } else {
+            // 未到滑动时机，刷新状态（诊断用）。
+            if (progress > 0) {
+                postNotify("进度 " + (int) (progress * 100) + "%  下次滑："
+                        + Math.max(0, (nextSwipeAfter - now) / 1000) + "s");
+            } else {
+                postNotify("运行中（读不到进度文本）下次滑："
+                        + Math.max(0, (nextSwipeAfter - now) / 1000) + "s");
             }
         }
     }
@@ -156,7 +192,7 @@ public class AutoSwipeService extends AccessibilityService {
         }
     }
 
-    /** 计算下一次兜底间隔（基础间隔 + [0, jitter) 随机抖动）。 */
+    /** 下一次兜底间隔 = 基础间隔 + [0, 抖动) 随机秒。 */
     private long computeDelay() {
         int base = AppPreferences.getIntervalSec(this) * 1000;
         int jitter = AppPreferences.getJitterSec(this) * 1000;
@@ -178,10 +214,34 @@ public class AutoSwipeService extends AccessibilityService {
         path.lineTo(x, endY);
 
         GestureDescription.Builder builder = new GestureDescription.Builder();
-        // 起点(start) 0ms，滑动持续 320ms，模拟人手上滑节奏。
         builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 320));
 
         return dispatchGesture(builder.build(), null, null);
+    }
+
+    private void createChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm != null) {
+            NotificationChannel ch = new NotificationChannel(
+                    CHANNEL_ID, "抖音自动刷", NotificationManager.IMPORTANCE_LOW);
+            ch.setDescription("自动刷运行状态");
+            nm.createNotificationChannel(ch);
+        }
+    }
+
+    /** 更新状态栏通知（诊断用，尽力而为，失败忽略）。 */
+    private void postNotify(String msg) {
+        if (nm == null) return;
+        try {
+            Notification n = new Notification.Builder(this, CHANNEL_ID)
+                    .setContentTitle("抖音自动刷")
+                    .setContentText(msg)
+                    .setSmallIcon(android.R.drawable.ic_media_play)
+                    .setOngoing(true)
+                    .build();
+            nm.notify(NOTIF_ID, n);
+        } catch (Exception e) {
+            Log.e(TAG, "notify fail", e);
+        }
     }
 
     @Override
@@ -192,6 +252,9 @@ public class AutoSwipeService extends AccessibilityService {
     @Override
     public void onDestroy() {
         stopLoop();
+        if (nm != null) {
+            try { nm.cancel(NOTIF_ID); } catch (Exception ignore) {}
+        }
         super.onDestroy();
     }
 

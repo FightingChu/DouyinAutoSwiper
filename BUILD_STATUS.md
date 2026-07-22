@@ -3,13 +3,14 @@
 > 本文件由 WorkBuddy 实时更新，反映最新构建进度。**无需等 AI 回复，直接打开本文件即可查看当前状态与 APK 位置。**
 > **近实时看板**：打开 `E:\buildtmp\LIVE_STATUS.txt`（每 30 秒刷新一次，显示进程此刻在做什么 / 进度%），比本文件更即时。
 
-最后更新：2026-07-22 23:11 (GMT+8)
+最后更新：2026-07-22 23:24 (GMT+8)
 
 ---
 
 ## 当前阶段
-**完全自治的单条流水线运行中（托管后台任务 `Vqrhb5`，脚本 `/e/buildtmp/pipeline.sh`；心跳任务 `310z1Y`）**：「装 SDK → 编译 → 报错自动修 → 循环 → 出包 → 推 GitHub」全自包含，**步骤间不依赖任何外部触发**。
-- android-34 已 100% 装好（android.jar 26MB 在盘），build-tools;34.0.0 已就位 → **已跳过安装，现处于 step2：`gradle assembleDebug` 编译中**（23:19 起，首次需联网拉 AGP+AndroidX 依赖，约数分钟）。
+✅ **构建完成！APK 已生成并推送到 GitHub。**
+- 本地 APK：`E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app-debug.apk`（5.4 MB，debug 签名）
+- GitHub：https://github.com/FightingChu/DouyinAutoSwiper （commit `6f82d56`）
 
 ## 历程
 | 时间 | 事件 | 结果 |
@@ -25,6 +26,10 @@
 | 23:11 | 终止 skoFqd，启动自包含自治流水线 PIPELINE（装→编→自修→出包→推 GitHub） | ✅ 运行中 |
 | 23:17 | 查进度发现流水线进程已死（之前用 shell `&` 启动，被沙箱回收）；android-34 已装好 | ❌ 进程回收 |
 | 23:19 | 改用工具托管后台任务重启流水线(Vqrhb5)+心跳(310z1Y)；跳过安装直奔编译 | ✅ 运行中 |
+| 23:21 | 编译失败：`accessibility_service_config.xml` 的 `android:settingsActivityName` 属性 AAPT 链接不识别 | ❌ BUILD FAILED |
+| 23:22 | 删除该可选属性 + 给流水线补"AAPT 属性找不到"自动修复规则；重启流水线(fe5WfZ) | ✅ 已修 |
+| 23:23 | 编译成功（33s），生成 app-debug.apk（5.4MB） | ✅ SUCCESS |
+| 23:24 | 推送到 GitHub（commit 6f82d56），本地远程已同步 | ✅ 完成 |
 
 ## 工具链
 - JDK：D:\jdk_17\jdk-17.0.11（已用 org.gradle.java.home 锁定）
@@ -38,4 +43,7 @@
 3. 失败 → 在本文件记录错误并继续修
 
 ## APK 产出
-（待构建，成功后填写路径与大小）
+- ✅ 路径：`E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app-debug.apk`
+- 大小：5.4 MB（5,613,494 字节）
+- 签名：Android debug 自带签名（手机开"允许未知来源"即可安装，无需自签）
+- GitHub：https://github.com/FightingChu/DouyinAutoSwiper （commit `6f82d56`）
