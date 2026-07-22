@@ -1,0 +1,24 @@
+R_DEF: Internal format may change without notice
+local
+color black
+color douyin_red
+color white
+drawable ic_launcher
+id btn_open_settings
+id btn_save
+id et_interval
+id et_jitter
+id sw_enabled
+id tv_status
+layout activity_main
+string accessibility_desc
+string app_name
+string enable_swipe
+string interval_label
+string jitter_label
+string open_settings
+string save_settings
+string subtitle
+string usage_tip
+style Theme.DouyinAutoSwiper
+xml accessibility_service_config
