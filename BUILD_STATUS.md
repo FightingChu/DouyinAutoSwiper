@@ -3,14 +3,30 @@
 > 本文件由 WorkBuddy 实时更新，反映最新构建进度。**无需等 AI 回复，直接打开本文件即可查看当前状态与 APK 位置。**
 > **近实时看板**：打开 `E:\buildtmp\LIVE_STATUS.txt`（每 30 秒刷新一次，显示进程此刻在做什么 / 进度%），比本文件更即时。
 
-最后更新：2026-07-22 23:24 (GMT+8)
+最后更新：2026-07-22 23:39 (GMT+8)
 
 ---
 
 ## 当前阶段
-✅ **构建完成！APK 已生成并推送到 GitHub。**
-- 本地 APK：`E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app-debug.apk`（5.4 MB，debug 签名）
-- GitHub：https://github.com/FightingChu/DouyinAutoSwiper （commit `6f82d56`）
+✅ **v2 已重新编译并推送 GitHub（修复"完全不滑动"的致命 bug）。**
+- 本地 APK：`E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app-debug.apk`（5.6 MB，debug 签名，23:39 重编）
+- GitHub：https://github.com/FightingChu/DouyinAutoSwiper （commit `9346c6a`）
+
+## v2 修复了什么（针对用户反馈"视频播完不自动切"）
+- **根因**：v1 用 `getRootInActiveWindow()` 判断"是否在抖音"，但无障碍配置漏了
+  `canRetrieveWindowContent="true"`，导致该方法返回 null → 判断永远失败 → **整个轮询空转、一次都不滑**。
+- **修复 1**：激活判断改用 `onAccessibilityEvent` 的**事件包名**（不依赖 root），抖音窗口内必命中。
+- **修复 2**：**定时滑动保证必跑**（到时间就上滑），不再赌进度文本是否可读。
+- **修复 3**：进度检测降级为"增强项"——读得到 `0:15/0:30` 类文本就"播完即切"，读不到走定时。
+- **修复 4**：加**状态栏通知**，实时显示「已滑动 N 次 / 原因 / 下次还有几秒」便于排查。
+- **配置**：`accessibility_service_config.xml` 补 `android:canRetrieveWindowContent="true"`；
+  `AndroidManifest.xml` 补 `POST_NOTIFICATIONS` 权限。
+
+## 重要边界（务必知悉）
+纯无障碍方案**读不到抖音播放进度**（进度条是自绘 View，非标准文本），
+所以"视频一播完就精确切走"**无法 100% 保证**。当前可靠行为是**定时自动滑动**
+（默认 15 秒、App 内可调短），体感即"自动刷"。若你手机抖音暴露了进度文本则更准。
+要真正的"播完即切"需投屏+图像识别或 root，属另一量级方案。
 
 ## 历程
 | 时间 | 事件 | 结果 |
@@ -30,6 +46,10 @@
 | 23:22 | 删除该可选属性 + 给流水线补"AAPT 属性找不到"自动修复规则；重启流水线(fe5WfZ) | ✅ 已修 |
 | 23:23 | 编译成功（33s），生成 app-debug.apk（5.4MB） | ✅ SUCCESS |
 | 23:24 | 推送到 GitHub（commit 6f82d56），本地远程已同步 | ✅ 完成 |
+| 23:33 | 用户反馈 v1 "视频播完不自动切、根本没用" | ❌ 反馈 |
+| 23:35 | 定位根因：`canRetrieveWindowContent` 缺失 → getRootInActiveWindow 返回 null → 循环空转 | 明确 |
+| 23:37 | v2 重写 AutoSwipeService（激活靠事件包名+定时必跑+状态栏通知）+ 补配置 | ✅ 已修 |
+| 23:39 | v2 编译成功（26s）生成 app-debug.apk（5.6MB），推送 GitHub（commit 9346c6a） | ✅ SUCCESS |
 
 ## 工具链
 - JDK：D:\jdk_17\jdk-17.0.11（已用 org.gradle.java.home 锁定）
