@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">抖音自动刷</string>
+    <string name="subtitle">抖音极速版自动上滑切换视频（无障碍辅助工具）</string>
+    <string name="accessibility_desc">自动在抖音极速版中模拟上滑手势切换视频，需要此权限才能工作。</string>
+
+    <string name="open_settings">前往系统设置开启无障碍权限</string>
+    <string name="enable_swipe">自动滑动开关</string>
+    <string name="interval_label">基础滑动间隔（秒）\n视频未播完时的兜底触发间隔</string>
+    <string name="jitter_label">随机抖动（秒）\n每次实际间隔会额外随机 0~N 秒，用于防检测</string>
+    <string name="save_settings">保存设置</string>
+    <string name="usage_tip">使用步骤：\n1. 点上方按钮，在系统「无障碍」里找到「抖音自动刷」并开启；\n2. 回到本应用，打开「自动滑动开关」；\n3. 打开抖音极速版进入视频播放页即可自动刷。\n\n注意：抖音极速版用户协议通常禁止自动化脚本，请合规使用，风险自负。</string>
+</resources>
