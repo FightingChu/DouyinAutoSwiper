@@ -61,4 +61,16 @@ public final class AppPreferences {
     public static void setOverlayEnabled(Context c, boolean v) {
         sp(c).edit().putBoolean(KEY_OVERLAY, v).apply();
     }
+
+    /**
+     * 悬浮窗折叠态：开 = 收成小圆点（隐藏大面板但仍可点恢复）。
+     * 仅当 overlay 开启时才有意义。默认不折叠。
+     */
+    private static final String KEY_OVERLAY_COLLAPSED = "overlay_collapsed";
+    public static boolean isOverlayCollapsed(Context c) {
+        return sp(c).getBoolean(KEY_OVERLAY_COLLAPSED, false);
+    }
+    public static void setOverlayCollapsed(Context c, boolean v) {
+        sp(c).edit().putBoolean(KEY_OVERLAY_COLLAPSED, v).apply();
+    }
 }

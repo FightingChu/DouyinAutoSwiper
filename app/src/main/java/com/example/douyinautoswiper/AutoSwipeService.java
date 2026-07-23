@@ -19,6 +19,12 @@ import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.TextView;
+import android.content.BroadcastReceiver;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.graphics.drawable.GradientDrawable;
+import android.widget.LinearLayout;
+import android.widget.Switch;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -62,6 +68,9 @@ public class AutoSwipeService extends AccessibilityService {
     private static final String CHANNEL_ID = "douyin_autoswiper_channel";
     private static final int NOTIF_ID = 1001;
 
+    /** MainActivity 改了悬浮窗开关后，广播给本服务做实时增删（修复「开了没窗」）。 */
+    static final String ACTION_OVERLAY_STATE = "com.example.douyinautoswiper.ACTION_OVERLAY_STATE";
+
     private Handler handler;
     private Runnable pollRunnable;
     private long lastSwipeTime = 0;
@@ -72,8 +81,12 @@ public class AutoSwipeService extends AccessibilityService {
 
     private DisplayMetrics dm;
     private WindowManager wm;
-    private TextView overlayView;
-    private WindowManager.LayoutParams overlayLp;
+    private View overlayPanel;
+    private View overlayBubble;
+    private TextView overlayStatusText;
+    private WindowManager.LayoutParams panelLp;
+    private WindowManager.LayoutParams bubbleLp;
+    private BroadcastReceiver overlayReceiver;
 
     @Override
     protected void onServiceConnected() {
@@ -83,9 +96,8 @@ public class AutoSwipeService extends AccessibilityService {
         wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         dm = getResources().getDisplayMetrics();
         createChannel();
-        if (AppPreferences.isOverlayEnabled(this)) {
-            initOverlay();
-        }
+        registerOverlayReceiver();
+        reconcileOverlay();
         nextSwipeAfter = System.currentTimeMillis() + computeDelay();
         startLoop();
         postNotify("服务已连接，等待抖音窗口");
@@ -261,52 +273,173 @@ public class AutoSwipeService extends AccessibilityService {
         return base + (long) (Math.random() * jitter);
     }
 
-    // ---------- 悬浮状态窗 ----------
+    // ---------- 悬浮状态窗（可交互面板 + 折叠小圆点） ----------
 
-    private void initOverlay() {
+    /**
+     * 根据偏好实时对齐悬浮窗：
+     *  - overlay 关 → 移除面板与小圆点；
+     *  - overlay 开且未折叠 → 显示面板（含自动刷/隐藏两个开关）；
+     *  - overlay 开且已折叠 → 仅显示可点击恢复的小圆点。
+     * 服务运行中也会被执行（MainActivity 改开关后通过广播触发），修复「开了却没窗」。
+     */
+    private void reconcileOverlay() {
         if (wm == null) return;
-        try {
-            overlayView = new TextView(this);
-            overlayView.setTextSize(12);
-            overlayView.setTextColor(0xFFFFFFFF);
-            overlayView.setBackgroundColor(0x66000000);
-            overlayView.setPadding(12, 6, 12, 6);
-            overlayLp = new WindowManager.LayoutParams(
+        boolean on = AppPreferences.isOverlayEnabled(this);
+        boolean collapsed = AppPreferences.isOverlayCollapsed(this);
+        if (!on) {
+            removeOverlay();
+            return;
+        }
+        if (collapsed) {
+            if (overlayPanel != null) {
+                try { wm.removeView(overlayPanel); } catch (Exception ignore) {}
+                overlayPanel = null;
+                overlayStatusText = null;
+            }
+            if (overlayBubble == null) {
+                overlayBubble = buildBubble();
+                wm.addView(overlayBubble, bubbleLp());
+            }
+        } else {
+            if (overlayBubble != null) {
+                try { wm.removeView(overlayBubble); } catch (Exception ignore) {}
+                overlayBubble = null;
+            }
+            if (overlayPanel == null) {
+                buildPanel();
+                wm.addView(overlayPanel, panelLp());
+                if (overlayStatusText != null) {
+                    overlayStatusText.setText("已滑动 " + swipeCount + " 次");
+                }
+            }
+        }
+    }
+
+    /** 悬浮面板：状态文字 + 「自动刷」开关 + 「隐藏悬浮窗」开关。可触摸。 */
+    private void buildPanel() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setBackgroundColor(0xCC000000);
+        panel.setPadding(16, 12, 16, 12);
+
+        TextView status = new TextView(this);
+        status.setTextSize(12);
+        status.setTextColor(0xFFFFFFFF);
+        status.setPadding(0, 0, 0, 10);
+
+        Switch swAuto = new Switch(this);
+        swAuto.setText("自动刷");
+        swAuto.setTextColor(0xFFFFFFFF);
+        swAuto.setChecked(AppPreferences.isAutoSwipeEnabled(this));
+        swAuto.setOnCheckedChangeListener((v, checked) ->
+                AppPreferences.setAutoSwipeEnabled(this, checked));
+
+        Switch swHide = new Switch(this);
+        swHide.setText("隐藏悬浮窗");
+        swHide.setTextColor(0xFFFFFFFF);
+        swHide.setChecked(AppPreferences.isOverlayCollapsed(this));
+        swHide.setOnCheckedChangeListener((v, checked) -> {
+            AppPreferences.setOverlayCollapsed(this, checked);
+            reconcileOverlay();   // 立即折叠/展开
+        });
+
+        panel.addView(status);
+        panel.addView(swAuto);
+        panel.addView(swHide);
+
+        overlayStatusText = status;
+        overlayPanel = panel;
+    }
+
+    /** 折叠态的小圆点：点击恢复完整面板。 */
+    private View buildBubble() {
+        TextView b = new TextView(this);
+        b.setText("显示");
+        b.setTextSize(13);
+        b.setTextColor(0xFFFFFFFF);
+        b.setGravity(Gravity.CENTER);
+        b.setClickable(true);
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(0xFF3F51B5);
+        b.setBackground(d);
+        b.setOnClickListener(v -> {
+            AppPreferences.setOverlayCollapsed(this, false);
+            reconcileOverlay();
+        });
+        return b;
+    }
+
+    private WindowManager.LayoutParams panelLp() {
+        if (panelLp == null) {
+            panelLp = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.WRAP_CONTENT,
                     WindowManager.LayoutParams.WRAP_CONTENT,
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                             ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                             : WindowManager.LayoutParams.TYPE_PHONE,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                            | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                            | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                    // 可触摸(去掉 NOT_TOUCHABLE)，但不抢焦点/键盘
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                     PixelFormat.TRANSLUCENT);
-            overlayLp.gravity = Gravity.TOP | Gravity.START;
-            overlayLp.x = 16;
-            overlayLp.y = 90;
-            wm.addView(overlayView, overlayLp);
-        } catch (Exception e) {
-            Log.e(TAG, "overlay init failed (权限?)", e);
-            overlayView = null;
+            panelLp.gravity = Gravity.TOP | Gravity.START;
+            panelLp.x = 16;
+            panelLp.y = 90;
         }
+        return panelLp;
+    }
+
+    private WindowManager.LayoutParams bubbleLp() {
+        if (bubbleLp == null) {
+            int size = (int) (56 * dm.density);
+            bubbleLp = new WindowManager.LayoutParams(
+                    size, size,
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                            ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                            : WindowManager.LayoutParams.TYPE_PHONE,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                    PixelFormat.TRANSLUCENT);
+            bubbleLp.gravity = Gravity.TOP | Gravity.END;
+            bubbleLp.x = 16;
+            bubbleLp.y = 90;
+        }
+        return bubbleLp;
     }
 
     private void updateOverlay(String msg) {
-        if (overlayView != null) {
+        if (overlayStatusText != null) {
             try {
-                overlayView.setText(msg);
+                overlayStatusText.setText(msg);
             } catch (Exception ignore) {
             }
         }
     }
 
     private void removeOverlay() {
-        if (wm != null && overlayView != null) {
-            try {
-                wm.removeView(overlayView);
-            } catch (Exception ignore) {
+        if (wm == null) return;
+        if (overlayPanel != null) {
+            try { wm.removeView(overlayPanel); } catch (Exception ignore) {}
+            overlayPanel = null;
+            overlayStatusText = null;
+        }
+        if (overlayBubble != null) {
+            try { wm.removeView(overlayBubble); } catch (Exception ignore) {}
+            overlayBubble = null;
+        }
+    }
+
+    private void registerOverlayReceiver() {
+        if (overlayReceiver != null) return;
+        overlayReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                reconcileOverlay();
             }
-            overlayView = null;
+        };
+        IntentFilter f = new IntentFilter(ACTION_OVERLAY_STATE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(overlayReceiver, f, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(overlayReceiver, f);
         }
     }
 
@@ -346,6 +479,10 @@ public class AutoSwipeService extends AccessibilityService {
     public void onDestroy() {
         stopLoop();
         removeOverlay();
+        if (overlayReceiver != null) {
+            try { unregisterReceiver(overlayReceiver); } catch (Exception ignore) {}
+            overlayReceiver = null;
+        }
         if (nm != null) {
             try { nm.cancel(NOTIF_ID); } catch (Exception ignore) {}
         }

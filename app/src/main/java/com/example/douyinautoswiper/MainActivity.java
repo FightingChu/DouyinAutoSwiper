@@ -74,9 +74,11 @@ public class MainActivity extends AppCompatActivity {
                     requestOverlayPermission();
                 } else {
                     AppPreferences.setOverlayEnabled(this, true);
+                    notifyOverlayChanged();
                 }
             } else {
                 AppPreferences.setOverlayEnabled(this, false);
+                notifyOverlayChanged();
             }
         });
 
@@ -104,6 +106,7 @@ public class MainActivity extends AppCompatActivity {
             pendingOverlay = false;
             AppPreferences.setOverlayEnabled(this, true);
             swOverlay.setChecked(true);
+            notifyOverlayChanged();
             Toast.makeText(this, "悬浮窗已开启", Toast.LENGTH_SHORT).show();
         }
         // 悬浮窗已开启但权限被收回，则回落并提示
@@ -123,6 +126,13 @@ public class MainActivity extends AppCompatActivity {
                     Uri.parse("package:" + getPackageName()));
             startActivity(intent);
         }
+    }
+
+    /** 通知运行中的无障碍服务：悬浮窗开关已变，请实时增删窗口。 */
+    private void notifyOverlayChanged() {
+        Intent i = new Intent(AutoSwipeService.ACTION_OVERLAY_STATE);
+        i.setPackage(getPackageName());
+        sendBroadcast(i);
     }
 
     private void updateStatus() {
