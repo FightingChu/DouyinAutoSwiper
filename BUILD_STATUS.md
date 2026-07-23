@@ -2,18 +2,24 @@
 
 > 流水线已完成，本文件为最终交付说明。
 
-## 最终状态：v2.2 已交付 ✅
-- 本地 APK：`DouyinAutoSwiper/app-debug.apk`（约 5.62 MB，debug 签名，2026-07-23 重编）
+## 最终状态：v2.4 已交付 ✅
+- 本地 APK：`DouyinAutoSwiper/app-debug.apk`（约 5.62 MB，debug 签名）
 - GitHub：https://github.com/FightingChu/DouyinAutoSwiper
 
-## v2.2 修复 + 增强（本次）
-1. **修复「开了悬浮窗却没窗」**：原实现只在服务 `onServiceConnected` 时一次性创建窗口，
-   服务已运行后用户在 App 里打开悬浮窗开关，只是改了偏好，运行中的服务不会重读 → 永远不显示。
-   改为：App 改开关后通过广播实时通知服务，`reconcileOverlay()` 立即增删窗口。
-2. **悬浮窗变为可交互面板**：去掉 `FLAG_NOT_TOUCHABLE`，面板内带两个开关——
-   - 「自动刷」：就地开/关自动滑动（服务轮询实时读取，等价于 App 主开关）；
-   - 「隐藏悬浮窗」：开启即折叠成右上角蓝色小圆点「显示」，点圆点恢复面板。
-   面板仅在角落占用，不挡视频中心，滑动手势不受影响。
+## v2.4 修复（本次，关键）
+- **真正根因**：悬浮窗一直用 `TYPE_APPLICATION_OVERLAY`，它【必须】`SYSTEM_ALERT_WINDOW` 权限。
+  在大量国产 ROM（MIUI / HarmonyOS / 各厂商）上，即使去设置页「授权」，
+  `Settings.canDrawOverlays()` 仍返回 false → App 把开关弹回关、偏好永远是 false → 窗口永远不出现。
+- **修法**：无障碍服务改用专为其设计的 `TYPE_ACCESSIBILITY_OVERLAY`（API≥27）。
+  它位于其他应用之上、且【不需要】`SYSTEM_ALERT_WINDOW` 权限，从根上绕开 ROM 限制。
+  App 端也不再因 `canDrawOverlays` 为 false 而拒绝开启（仅 Android 8.0 以下回退 TYPE_PHONE 才需授权）。
+- 保留 v2.2/v2.3 的：广播实时同步、循环自愈（偏好/权限变化即对齐窗口）、可交互面板
+  （「自动刷」「隐藏悬浮窗」开关）、折叠小圆点、异常兜底不拖垮服务。
+
+## 重要：装完新版后请这样做
+1. 手机「设置 → 无障碍」里，把「抖音自动刷」**先关掉再打开一次**（装新版不会自动重载旧服务代码）。
+2. 打开本 App → 打开「悬浮状态窗」开关 → 进抖音极速版，左上角应出现半透明面板。
+3. 若仍无：多半是无障碍服务没重载，重复第 1 步即可。
 
 ## v2.1 相对 v2 的改动（保留）
 1. **拟人化随机滑动（默认开）**：每次上滑的起始 X、终点 X（带横向偏移，不绝对垂直）、

@@ -10,6 +10,7 @@ import android.graphics.PixelFormat;
 import android.graphics.Path;
 import android.os.Build;
 import android.os.Handler;
+import android.provider.Settings;
 import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -87,6 +88,9 @@ public class AutoSwipeService extends AccessibilityService {
     private WindowManager.LayoutParams panelLp;
     private WindowManager.LayoutParams bubbleLp;
     private BroadcastReceiver overlayReceiver;
+    private boolean lastOverlayOn = false;
+    private boolean lastOverlayCollapsed = false;
+    private boolean lastOverlayPerm = false;
 
     @Override
     protected void onServiceConnected() {
@@ -96,8 +100,16 @@ public class AutoSwipeService extends AccessibilityService {
         wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         dm = getResources().getDisplayMetrics();
         createChannel();
-        registerOverlayReceiver();
-        reconcileOverlay();
+        try {
+            registerOverlayReceiver();
+        } catch (Exception e) {
+            Log.e(TAG, "registerOverlayReceiver fail", e);
+        }
+        try {
+            reconcileOverlay();
+        } catch (Exception e) {
+            Log.e(TAG, "reconcileOverlay fail", e);
+        }
         nextSwipeAfter = System.currentTimeMillis() + computeDelay();
         startLoop();
         postNotify("服务已连接，等待抖音窗口");
@@ -129,6 +141,17 @@ public class AutoSwipeService extends AccessibilityService {
     }
 
     private void tick() {
+        // 自愈：悬浮窗开关/折叠态/权限一旦变化（含装新版后旧偏好仍在），立即对齐窗口
+        boolean oOn = AppPreferences.isOverlayEnabled(this);
+        boolean oCol = AppPreferences.isOverlayCollapsed(this);
+        boolean oPerm = hasOverlayPermission();
+        if (oOn != lastOverlayOn || oCol != lastOverlayCollapsed || oPerm != lastOverlayPerm) {
+            lastOverlayOn = oOn;
+            lastOverlayCollapsed = oCol;
+            lastOverlayPerm = oPerm;
+            reconcileOverlay();
+        }
+
         if (!AppPreferences.isAutoSwipeEnabled(this)) {
             postNotify("已停止：App 内开关已关闭");
             return;
@@ -290,6 +313,13 @@ public class AutoSwipeService extends AccessibilityService {
             removeOverlay();
             return;
         }
+        // 仅 API<27（回退 TYPE_PHONE）才需要 SYSTEM_ALERT_WINDOW；
+        // API>=27 用 TYPE_ACCESSIBILITY_OVERLAY，无需该权限，直接显示
+        if (needsSystemAlertWindow() && !hasOverlayPermission()) {
+            postNotify("悬浮窗未显示：未授权「显示在其他应用上」");
+            removeOverlay();
+            return;
+        }
         if (collapsed) {
             if (overlayPanel != null) {
                 try { wm.removeView(overlayPanel); } catch (Exception ignore) {}
@@ -297,8 +327,13 @@ public class AutoSwipeService extends AccessibilityService {
                 overlayStatusText = null;
             }
             if (overlayBubble == null) {
-                overlayBubble = buildBubble();
-                wm.addView(overlayBubble, bubbleLp());
+                try {
+                    overlayBubble = buildBubble();
+                    wm.addView(overlayBubble, bubbleLp());
+                } catch (Exception e) {
+                    Log.e(TAG, "bubble add failed", e);
+                    postNotify("悬浮窗失败：" + e.getMessage());
+                }
             }
         } else {
             if (overlayBubble != null) {
@@ -306,13 +341,43 @@ public class AutoSwipeService extends AccessibilityService {
                 overlayBubble = null;
             }
             if (overlayPanel == null) {
-                buildPanel();
-                wm.addView(overlayPanel, panelLp());
-                if (overlayStatusText != null) {
-                    overlayStatusText.setText("已滑动 " + swipeCount + " 次");
+                try {
+                    buildPanel();
+                    wm.addView(overlayPanel, panelLp());
+                    if (overlayStatusText != null) {
+                        overlayStatusText.setText("已滑动 " + swipeCount + " 次");
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "panel add failed", e);
+                    postNotify("悬浮窗失败：" + e.getMessage());
                 }
             }
         }
+    }
+
+    private boolean hasOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            return Settings.canDrawOverlays(this);
+        }
+        return true;
+    }
+
+    /**
+     * 悬浮窗类型：无障碍服务应使用 TYPE_ACCESSIBILITY_OVERLAY，
+     * 它专供无障碍服务展示界面、位于其他应用之上，且【不需要】SYSTEM_ALERT_WINDOW 权限
+     * （很多国产 ROM 上该权限即使「授权」也返回 false，导致窗口永远加不上）。
+     * 仅 Android 8.1(API 27) 以下无此类型时，回退到需要权限的 TYPE_PHONE。
+     */
+    private int overlayWindowType() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            return WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
+        }
+        return WindowManager.LayoutParams.TYPE_PHONE;
+    }
+
+    /** 仅 API<27 才需要 SYSTEM_ALERT_WINDOW 权限。 */
+    private boolean needsSystemAlertWindow() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1;
     }
 
     /** 悬浮面板：状态文字 + 「自动刷」开关 + 「隐藏悬浮窗」开关。可触摸。 */
@@ -375,10 +440,8 @@ public class AutoSwipeService extends AccessibilityService {
             panelLp = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.WRAP_CONTENT,
                     WindowManager.LayoutParams.WRAP_CONTENT,
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                            ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                            : WindowManager.LayoutParams.TYPE_PHONE,
-                    // 可触摸(去掉 NOT_TOUCHABLE)，但不抢焦点/键盘
+                    overlayWindowType(),
+                    // 可触摸(无 NOT_TOUCHABLE)，但不抢焦点/键盘
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                     PixelFormat.TRANSLUCENT);
             panelLp.gravity = Gravity.TOP | Gravity.START;
@@ -393,9 +456,7 @@ public class AutoSwipeService extends AccessibilityService {
             int size = (int) (56 * dm.density);
             bubbleLp = new WindowManager.LayoutParams(
                     size, size,
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                            ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                            : WindowManager.LayoutParams.TYPE_PHONE,
+                    overlayWindowType(),
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                     PixelFormat.TRANSLUCENT);
             bubbleLp.gravity = Gravity.TOP | Gravity.END;

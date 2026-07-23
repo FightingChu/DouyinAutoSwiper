@@ -2100,7 +2100,7 @@
     <string description="Button text to indicate that the widget will ignore the user&apos;s selection [CHAR_LIMIT=16]" name="mtrl_timepicker_cancel">Cancel</string>
     <string description="Button text to indicate that the widget will save the user&apos;s selection [CHAR_LIMIT=16]" name="mtrl_timepicker_confirm">OK</string>
     <string name="open_settings">前往系统设置开启无障碍权限</string>
-    <string name="overlay_hint">在抖音上层角落显示实时状态，不影响滑动；首次开启需授权「显示在其他应用上」</string>
+    <string name="overlay_hint">在抖音上层角落显示实时状态与开关，不影响滑动。Android 8.1 以上使用无障碍专用悬浮层，无需额外授权；仅 Android 8.0 以下需在「显示在其他应用上」授权</string>
     <string name="overlay_label">悬浮状态窗（可选）</string>
     <string name="overlay_permission_tip">开启悬浮窗需授权「显示在其他应用上」，请在设置中允许本应用</string>
     <string name="password_toggle_content_description">Show password</string>

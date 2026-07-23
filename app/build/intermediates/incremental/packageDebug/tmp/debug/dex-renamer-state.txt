@@ -1,4 +1,4 @@
-#Thu Jul 23 09:10:35 CST 2026
+#Thu Jul 23 09:42:48 CST 2026
 base.2=E\:\\workbuddyTmp\\2026-07-22-21-12-53\\DouyinAutoSwiper\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\14\\classes.dex
 path.2=14/classes.dex
 base.1=E\:\\workbuddyTmp\\2026-07-22-21-12-53\\DouyinAutoSwiper\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\0\\classes.dex

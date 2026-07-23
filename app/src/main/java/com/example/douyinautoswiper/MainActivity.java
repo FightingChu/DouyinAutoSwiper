@@ -64,8 +64,12 @@ public class MainActivity extends AppCompatActivity {
 
         swOverlay.setOnCheckedChangeListener((buttonView, checked) -> {
             if (checked) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-                        && !Settings.canDrawOverlays(this)) {
+                // Android 8.1+(API27) 用 TYPE_ACCESSIBILITY_OVERLAY，无需 SYSTEM_ALERT_WINDOW；
+                // 仅旧系统回退 TYPE_PHONE 时才需要授权
+                boolean needPerm = Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1
+                        && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                        && !Settings.canDrawOverlays(this);
+                if (needPerm) {
                     // 先记为关，等用户授权返回后再开
                     AppPreferences.setOverlayEnabled(this, false);
                     swOverlay.setChecked(false);
@@ -144,6 +148,13 @@ public class MainActivity extends AppCompatActivity {
             tvStatus.setText("状态：已就绪，自动滑动关闭");
         } else {
             tvStatus.setText("状态：运行中（正在自动刷）");
+        }
+        // 悬浮窗权限提示：仅 Android 8.1 以下（回退 TYPE_PHONE）才需要授权
+        if (AppPreferences.isOverlayEnabled(this)
+                && Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1
+                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && !Settings.canDrawOverlays(this)) {
+            tvStatus.setText(tvStatus.getText() + "\n⚠ 悬浮窗未授权「显示在其他应用上」，请在设置中允许");
         }
     }
 
