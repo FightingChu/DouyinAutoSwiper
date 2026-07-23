@@ -3499,6 +3499,8 @@ id submenuarrow
 id submit_area
 id supportScrollUp
 id sw_enabled
+id sw_humanize
+id sw_overlay
 id tabMode
 id tag_accessibility_actions
 id tag_accessibility_clickable_spans
@@ -3810,6 +3812,8 @@ string exposed_dropdown_menu_content_description
 string fab_transformation_scrim_behavior
 string fab_transformation_sheet_behavior
 string hide_bottom_view_on_scroll_behavior
+string humanize_hint
+string humanize_label
 string icon_content_description
 string interval_label
 string item_view_role_description
@@ -3915,6 +3919,9 @@ string mtrl_switch_track_path
 string mtrl_timepicker_cancel
 string mtrl_timepicker_confirm
 string open_settings
+string overlay_hint
+string overlay_label
+string overlay_permission_tip
 string password_toggle_content_description
 string path_password_eye
 string path_password_eye_mask_strike_through

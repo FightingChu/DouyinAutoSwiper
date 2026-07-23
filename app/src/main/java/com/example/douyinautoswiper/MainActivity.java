@@ -1,6 +1,8 @@
 package com.example.douyinautoswiper;
 
 import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.widget.Button;
@@ -19,10 +21,14 @@ public class MainActivity extends AppCompatActivity {
             "com.example.douyinautoswiper/com.example.douyinautoswiper.AutoSwipeService";
 
     private Switch swEnabled;
+    private Switch swHumanize;
+    private Switch swOverlay;
     private EditText etInterval;
     private EditText etJitter;
     private TextView tvStatus;
     private Button btnOpenSettings;
+    /** 记录用户「想开悬浮窗但待授权」的意图，授权返回后自动开启。 */
+    private boolean pendingOverlay = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,12 +36,16 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         swEnabled = findViewById(R.id.sw_enabled);
+        swHumanize = findViewById(R.id.sw_humanize);
+        swOverlay = findViewById(R.id.sw_overlay);
         etInterval = findViewById(R.id.et_interval);
         etJitter = findViewById(R.id.et_jitter);
         tvStatus = findViewById(R.id.tv_status);
         btnOpenSettings = findViewById(R.id.btn_open_settings);
 
         swEnabled.setChecked(AppPreferences.isAutoSwipeEnabled(this));
+        swHumanize.setChecked(AppPreferences.isHumanizeEnabled(this));
+        swOverlay.setChecked(AppPreferences.isOverlayEnabled(this));
         etInterval.setText(String.valueOf(AppPreferences.getIntervalSec(this)));
         etJitter.setText(String.valueOf(AppPreferences.getJitterSec(this)));
 
@@ -46,6 +56,27 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, "请先在系统设置中开启本应用的无障碍权限",
                         Toast.LENGTH_LONG).show();
                 openAccessibilitySettings();
+            }
+        });
+
+        swHumanize.setOnCheckedChangeListener((buttonView, checked) ->
+                AppPreferences.setHumanizeEnabled(this, checked));
+
+        swOverlay.setOnCheckedChangeListener((buttonView, checked) -> {
+            if (checked) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                        && !Settings.canDrawOverlays(this)) {
+                    // 先记为关，等用户授权返回后再开
+                    AppPreferences.setOverlayEnabled(this, false);
+                    swOverlay.setChecked(false);
+                    Toast.makeText(this, R.string.overlay_permission_tip, Toast.LENGTH_LONG).show();
+                    pendingOverlay = true;
+                    requestOverlayPermission();
+                } else {
+                    AppPreferences.setOverlayEnabled(this, true);
+                }
+            } else {
+                AppPreferences.setOverlayEnabled(this, false);
             }
         });
 
@@ -67,7 +98,31 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // 用户此前想开悬浮窗、刚在设置页授完权，回来自动开启
+        if (pendingOverlay && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && Settings.canDrawOverlays(this)) {
+            pendingOverlay = false;
+            AppPreferences.setOverlayEnabled(this, true);
+            swOverlay.setChecked(true);
+            Toast.makeText(this, "悬浮窗已开启", Toast.LENGTH_SHORT).show();
+        }
+        // 悬浮窗已开启但权限被收回，则回落并提示
+        if (AppPreferences.isOverlayEnabled(this)
+                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && !Settings.canDrawOverlays(this)) {
+            AppPreferences.setOverlayEnabled(this, false);
+            swOverlay.setChecked(false);
+            Toast.makeText(this, R.string.overlay_permission_tip, Toast.LENGTH_LONG).show();
+        }
         updateStatus();
+    }
+
+    private void requestOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName()));
+            startActivity(intent);
+        }
     }
 
     private void updateStatus() {

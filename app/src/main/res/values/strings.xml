@@ -8,5 +8,10 @@
     <string name="interval_label">基础滑动间隔（秒）\n视频未播完时的兜底触发间隔</string>
     <string name="jitter_label">随机抖动（秒）\n每次实际间隔会额外随机 0~N 秒，用于防检测</string>
     <string name="save_settings">保存设置</string>
+    <string name="humanize_label">拟人化随机滑动（推荐开）</string>
+    <string name="humanize_hint">每次上滑的坐标/轨迹/时长随机化，并偶发停顿，降低机械感</string>
+    <string name="overlay_label">悬浮状态窗（可选）</string>
+    <string name="overlay_hint">在抖音上层角落显示实时状态，不影响滑动；首次开启需授权「显示在其他应用上」</string>
+    <string name="overlay_permission_tip">开启悬浮窗需授权「显示在其他应用上」，请在设置中允许本应用</string>
     <string name="usage_tip">使用步骤：\n1. 点上方按钮，在系统「无障碍」里找到「抖音自动刷」并开启；\n2. 回到本应用，打开「自动滑动开关」；\n3. 打开抖音极速版进入视频播放页即可自动刷。\n\n注意：抖音极速版用户协议通常禁止自动化脚本，请合规使用，风险自负。</string>
 </resources>

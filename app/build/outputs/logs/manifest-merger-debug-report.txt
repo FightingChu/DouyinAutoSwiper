@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:2:1-38:12
-INJECTED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:2:1-38:12
-INJECTED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:2:1-38:12
-INJECTED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:2:1-38:12
+ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:2:1-40:12
+INJECTED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:2:1-40:12
+INJECTED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:2:1-40:12
+INJECTED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:2:1-40:12
 MERGED from [com.google.android.material:material:1.11.0] C:\Users\ChuSi\.gradle\caches\8.8\transforms\db137fdee59be445ff715840145a95a6\transformed\material-1.11.0\AndroidManifest.xml:17:1-24:12
 MERGED from [androidx.constraintlayout:constraintlayout:2.1.4] C:\Users\ChuSi\.gradle\caches\8.8\transforms\f6bde037fca0444cefa054352e09eb90\transformed\constraintlayout-2.1.4\AndroidManifest.xml:2:1-11:12
 MERGED from [androidx.appcompat:appcompat-resources:1.6.1] C:\Users\ChuSi\.gradle\caches\8.8\transforms\cd60d445cb1f9f4dfca4d9439f17b6ab\transformed\appcompat-resources-1.6.1\AndroidManifest.xml:17:1-22:12
@@ -57,9 +57,13 @@ uses-permission#android.permission.POST_NOTIFICATIONS
 ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:5:5-77
 	android:name
 		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:5:22-74
+uses-permission#android.permission.SYSTEM_ALERT_WINDOW
+ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:7:5-78
+	android:name
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:7:22-75
 application
-ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:7:5-36:19
-INJECTED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:7:5-36:19
+ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:9:5-38:19
+INJECTED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:9:5-38:19
 MERGED from [com.google.android.material:material:1.11.0] C:\Users\ChuSi\.gradle\caches\8.8\transforms\db137fdee59be445ff715840145a95a6\transformed\material-1.11.0\AndroidManifest.xml:22:5-20
 MERGED from [com.google.android.material:material:1.11.0] C:\Users\ChuSi\.gradle\caches\8.8\transforms\db137fdee59be445ff715840145a95a6\transformed\material-1.11.0\AndroidManifest.xml:22:5-20
 MERGED from [androidx.constraintlayout:constraintlayout:2.1.4] C:\Users\ChuSi\.gradle\caches\8.8\transforms\f6bde037fca0444cefa054352e09eb90\transformed\constraintlayout-2.1.4\AndroidManifest.xml:9:5-20
@@ -81,53 +85,53 @@ MERGED from [androidx.startup:startup-runtime:1.1.1] C:\Users\ChuSi\.gradle\cach
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.9.0] C:\Users\ChuSi\.gradle\caches\8.8\transforms\f92fecc821053fd6aca5784fd94ad77e\transformed\core-1.9.0\AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:11:9-35
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:13:9-35
 	android:label
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:10:9-41
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:12:9-41
 	android:icon
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:9:9-45
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:11:9-45
 	android:allowBackup
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:8:9-35
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:10:9-35
 	android:theme
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:12:9-54
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:14:9-54
 activity#com.example.douyinautoswiper.MainActivity
-ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:14:9-22:20
+ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:16:9-24:20
 	android:screenOrientation
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:17:13-49
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:19:13-49
 	android:exported
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:16:13-36
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:18:13-36
 	android:name
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:15:13-41
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:17:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:18:13-21:29
+ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:20:13-23:29
 action#android.intent.action.MAIN
-ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:19:17-69
+ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:21:17-69
 	android:name
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:19:25-66
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:21:25-66
 category#android.intent.category.LAUNCHER
-ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:20:17-77
+ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:22:17-77
 	android:name
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:20:27-74
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:22:27-74
 service#com.example.douyinautoswiper.AutoSwipeService
-ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:24:9-34:19
+ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:26:9-36:19
 	android:exported
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:26:13-37
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:28:13-37
 	android:permission
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:27:13-79
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:29:13-79
 	android:name
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:25:13-45
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:27:13-45
 intent-filter#action:name:android.accessibilityservice.AccessibilityService
-ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:28:13-30:29
+ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:30:13-32:29
 action#android.accessibilityservice.AccessibilityService
-ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:29:17-92
+ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:31:17-92
 	android:name
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:29:25-89
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:31:25-89
 meta-data#android.accessibilityservice
-ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:31:13-33:72
+ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:33:13-35:72
 	android:resource
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:33:17-69
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:35:17-69
 	android:name
-		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:32:17-60
+		ADDED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml:34:17-60
 uses-sdk
 INJECTED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from E:\workbuddyTmp\2026-07-22-21-12-53\DouyinAutoSwiper\app\src\main\AndroidManifest.xml

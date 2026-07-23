@@ -3,6 +3,8 @@
 
     <!-- 状态栏诊断通知所需（Android 13+ 运行时权限，服务内尽力而为，缺失不影响滑动） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 悬浮状态窗所需（可选功能，关闭悬浮窗则无需授权；缺失时自动跳过，不影响滑动） -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:allowBackup="true"

@@ -43,4 +43,22 @@ public final class AppPreferences {
     public static void setJitterSec(Context c, int v) {
         sp(c).edit().putInt(KEY_JITTER, Math.max(0, v)).apply();
     }
+
+    /** 拟人化随机滑动：随机坐标/轨迹弧度/时长 + 小概率停顿。默认开。 */
+    private static final String KEY_HUMANIZE = "humanize";
+    public static boolean isHumanizeEnabled(Context c) {
+        return sp(c).getBoolean(KEY_HUMANIZE, true);
+    }
+    public static void setHumanizeEnabled(Context c, boolean v) {
+        sp(c).edit().putBoolean(KEY_HUMANIZE, v).apply();
+    }
+
+    /** 悬浮状态窗：抖音上层角落显示实时状态（不影响滑动）。默认关。 */
+    private static final String KEY_OVERLAY = "overlay";
+    public static boolean isOverlayEnabled(Context c) {
+        return sp(c).getBoolean(KEY_OVERLAY, false);
+    }
+    public static void setOverlayEnabled(Context c, boolean v) {
+        sp(c).edit().putBoolean(KEY_OVERLAY, v).apply();
+    }
 }

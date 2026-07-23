@@ -6,32 +6,37 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.graphics.PixelFormat;
 import android.graphics.Path;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.View;
+import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.TextView;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 抖音极速版自动刷服务（v2）。
+ * 抖音极速版自动刷服务（v2.1）。
  *
- * 关键修正（相对 v1）：
- *  - 激活判断改用 onAccessibilityEvent 的「事件包名」，不再依赖
- *    getRootInActiveWindow()（v1 因 canRetrieveWindowContent 未开启导致
- *    getRootInActiveWindow 返回 null，整个轮询空转、一次都不滑）。
- *  - 定时滑动保证「必跑」：只要处于抖音窗口且开关开启，到时间就一定上滑，
- *    不依赖进度文本是否可读。
- *  - 进度检测降级为「增强项」：能读到进度文本就「播完即切」，读不到就走定时。
- *  - 状态栏通知：实时显示「已滑动 N 次 / 原因 / 当前进度」，便于排查。
+ * 相对 v2 的改进：
+ *  - 拟人化随机滑动（默认开）：每次上滑的起始 X、终点 X（带横向偏移）、
+ *    Y 区间、滑动时长、轨迹弧度均随机化；小概率「本次停顿跳过」模拟看入神；
+ *    小概率「手势末段微回弹」模拟手指抖动。整体节奏不再规律。
+ *  - 可选悬浮状态窗（默认关）：在抖音上层角落显示实时状态文字，
+ *    不拦截触摸、不影响滑动；抖音本身无感。需 SYSTEM_ALERT_WINDOW 权限。
+ *  - 保留 v2 的修复：激活判断靠事件包名、定时必跑、状态栏通知诊断。
  *
- * 关于「播完即切」的边界：抖音播放页进度条多为自定义 View，无障碍 often
- * 读不到文本，因此纯无障碍方案下「精确播完即切」不可靠。本服务以定时滑动
- * 为主，进度检测为辅。若你手机上抖音确实暴露了 "0:15/0:30" 类文本则会更准。
+ * 风控边界说明：纯无障碍方案读不到抖音播放进度（自绘 View），抖音侧
+ * 也无法感知本 App。拟人化仅降低「行为规律性」被模型识别的概率，不保证
+ * 绝对安全；请合规使用、风险自负。
  */
 public class AutoSwipeService extends AccessibilityService {
 
@@ -40,16 +45,17 @@ public class AutoSwipeService extends AccessibilityService {
     /** 抖音极速版包名。普通版抖音请改成 com.ss.android.ugc.aweme（见 README）。 */
     private static final String TARGET_PACKAGE = "com.ss.android.ugc.aweme.lite";
 
-    /** 轮询间隔（毫秒）。 */
     private static final long POLL_MS = 1000;
-
     /** 两次上滑最小间隔（毫秒），防止手势重叠 / 切换过快。 */
     private static final long MIN_SWIPE_INTERVAL_MS = 2500;
-
     /** 进度达到该比例即视为「播完」，立即上滑。 */
     private static final float DONE_THRESHOLD = 0.95f;
 
-    /** 匹配 "0:15/0:30" 或 "00:15/00:30" 形式的进度文本。 */
+    /** 拟人化：本次「随机停顿」概率（0~1）。 */
+    private static final double PAUSE_PROB = 0.08;
+    /** 拟人化：手势末段「微回弹」概率（0~1）。 */
+    private static final double REBOUND_PROB = 0.25;
+
     private static final Pattern PROGRESS_PATTERN =
             Pattern.compile("(\\d{1,2}:\\d{2})\\s*/\\s*(\\d{1,2}:\\d{2})");
 
@@ -59,21 +65,27 @@ public class AutoSwipeService extends AccessibilityService {
     private Handler handler;
     private Runnable pollRunnable;
     private long lastSwipeTime = 0;
-    /** 下一次定时兜底上滑的目标时间戳。 */
     private long nextSwipeAfter = 0;
-
-    /** 当前是否处于抖音极速版窗口（由事件包名推断，不依赖 root）。 */
     private boolean targetActive = false;
-
     private int swipeCount = 0;
     private NotificationManager nm;
+
+    private DisplayMetrics dm;
+    private WindowManager wm;
+    private TextView overlayView;
+    private WindowManager.LayoutParams overlayLp;
 
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
         handler = new Handler(Looper.getMainLooper());
         nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+        dm = getResources().getDisplayMetrics();
         createChannel();
+        if (AppPreferences.isOverlayEnabled(this)) {
+            initOverlay();
+        }
         nextSwipeAfter = System.currentTimeMillis() + computeDelay();
         startLoop();
         postNotify("服务已连接，等待抖音窗口");
@@ -85,15 +97,12 @@ public class AutoSwipeService extends AccessibilityService {
         CharSequence pkg = event.getPackageName();
         if (pkg == null) return;
         String p = pkg.toString();
-        // 只在「窗口状态/内容变化」时更新激活状态（避免滚动事件频繁抖动）。
         if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
                 || event.getEventType() == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
             targetActive = TARGET_PACKAGE.equals(p);
         }
-        // 实际滑动在轮询中统一处理，这里仅维护 targetActive 标志。
     }
 
-    /** 启动轮询循环。 */
     private void startLoop() {
         pollRunnable = new Runnable() {
             @Override
@@ -107,7 +116,6 @@ public class AutoSwipeService extends AccessibilityService {
         handler.postDelayed(pollRunnable, POLL_MS);
     }
 
-    /** 一次轮询：决定是否上滑。 */
     private void tick() {
         if (!AppPreferences.isAutoSwipeEnabled(this)) {
             postNotify("已停止：App 内开关已关闭");
@@ -124,35 +132,89 @@ public class AutoSwipeService extends AccessibilityService {
         boolean timeUp = now >= nextSwipeAfter;
         boolean canSwipe = (now - lastSwipeTime) >= MIN_SWIPE_INTERVAL_MS;
 
-        if (canSwipe && (progressDone || timeUp)) {
-            boolean ok = performSwipeUp();
-            if (ok) {
-                swipeCount++;
-                lastSwipeTime = now;
-                nextSwipeAfter = now + computeDelay();
-                String reason = progressDone ? "进度满" : "定时";
-                postNotify("已滑动 " + swipeCount + " 次（" + reason + "）");
-                Log.d(TAG, "swipe #" + swipeCount + " reason=" + reason);
-            } else {
-                postNotify("手势失败：请确认系统无障碍已启用本服务");
-                Log.e(TAG, "dispatchGesture returned false");
-            }
-        } else {
-            // 未到滑动时机，刷新状态（诊断用）。
+        if (!canSwipe) {
+            return; // 节流中，保持静默避免刷屏
+        }
+        if (!(progressDone || timeUp)) {
             if (progress > 0) {
                 postNotify("进度 " + (int) (progress * 100) + "%  下次滑："
                         + Math.max(0, (nextSwipeAfter - now) / 1000) + "s");
             } else {
-                postNotify("运行中（读不到进度文本）下次滑："
+                postNotify("运行中（读不到进度）下次滑："
                         + Math.max(0, (nextSwipeAfter - now) / 1000) + "s");
             }
+            return;
+        }
+
+        // 到了该滑动的时机
+        boolean humanize = AppPreferences.isHumanizeEnabled(this);
+        if (humanize && Math.random() < PAUSE_PROB) {
+            // 拟人化：本次「看入神」随机停顿，延后一小段再判，不计数
+            nextSwipeAfter = now + 1200 + (long) (Math.random() * 1500);
+            postNotify("运行中·本次随机停顿(拟人化)");
+            return;
+        }
+
+        boolean ok = performSwipeUp(humanize);
+        if (ok) {
+            swipeCount++;
+            lastSwipeTime = now;
+            nextSwipeAfter = now + computeDelay();
+            String reason = progressDone ? "进度满" : "定时";
+            postNotify("已滑动 " + swipeCount + " 次（" + reason + "）");
+            Log.d(TAG, "swipe #" + swipeCount + " reason=" + reason);
+        } else {
+            postNotify("手势失败：请确认系统无障碍已启用本服务");
+            Log.e(TAG, "dispatchGesture returned false");
         }
     }
 
     /**
-     * 尝试从当前窗口解析视频进度比例。
-     * @return 0~1 的进度；读不到返回 -1。
+     * 模拟一段上滑手势。humanize=true 时坐标/轨迹/时长全部随机化。
      */
+    private boolean performSwipeUp(boolean humanize) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false;
+
+        int w = dm.widthPixels;
+        int h = dm.heightPixels;
+
+        int startX, endX, startY, endY, duration;
+        if (humanize) {
+            startX = (int) (w * (0.35 + Math.random() * 0.30));          // 0.35~0.65
+            endX = clamp(startX + (int) ((Math.random() - 0.5) * w * 0.10),
+                    (int) (w * 0.20), (int) (w * 0.80));                  // 带横向偏移
+            startY = (int) (h * (0.70 + Math.random() * 0.15));           // 0.70~0.85
+            endY = (int) (h * (0.15 + Math.random() * 0.15));             // 0.15~0.30
+            duration = 260 + (int) (Math.random() * 260);                 // 260~520ms
+        } else {
+            startX = w / 2;
+            endX = w / 2;
+            startY = (int) (h * 0.78);
+            endY = (int) (h * 0.22);
+            duration = 320;
+        }
+
+        Path path = new Path();
+        path.moveTo(startX, startY);
+        // 中段控制点带随机横向偏移，形成轻微弧度（真人手指不会绝对笔直）
+        int midX = (startX + endX) / 2 + (humanize ? (int) ((Math.random() - 0.5) * w * 0.06) : 0);
+        int midY = (startY + endY) / 2;
+        path.quadTo(midX, midY, endX, endY);
+        // 小概率末段微回弹：往回退几像素，模拟手指抬起前抖动
+        if (humanize && Math.random() < REBOUND_PROB) {
+            path.lineTo(endX + (int) ((Math.random() - 0.5) * 24),
+                    endY + (int) (h * 0.02));
+        }
+
+        GestureDescription.Builder builder = new GestureDescription.Builder();
+        builder.addStroke(new GestureDescription.StrokeDescription(path, 0, duration));
+        return dispatchGesture(builder.build(), null, null);
+    }
+
+    private static int clamp(int v, int lo, int hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
     private float detectProgress() {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return -1f;
@@ -199,25 +261,56 @@ public class AutoSwipeService extends AccessibilityService {
         return base + (long) (Math.random() * jitter);
     }
 
-    /** 在屏幕中部模拟一段垂直上滑手势。 */
-    private boolean performSwipeUp() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false;
+    // ---------- 悬浮状态窗 ----------
 
-        int w = getResources().getDisplayMetrics().widthPixels;
-        int h = getResources().getDisplayMetrics().heightPixels;
-        int x = w / 2;
-        int startY = (int) (h * 0.78f);
-        int endY = (int) (h * 0.22f);
-
-        Path path = new Path();
-        path.moveTo(x, startY);
-        path.lineTo(x, endY);
-
-        GestureDescription.Builder builder = new GestureDescription.Builder();
-        builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 320));
-
-        return dispatchGesture(builder.build(), null, null);
+    private void initOverlay() {
+        if (wm == null) return;
+        try {
+            overlayView = new TextView(this);
+            overlayView.setTextSize(12);
+            overlayView.setTextColor(0xFFFFFFFF);
+            overlayView.setBackgroundColor(0x66000000);
+            overlayView.setPadding(12, 6, 12, 6);
+            overlayLp = new WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                            ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                            : WindowManager.LayoutParams.TYPE_PHONE,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                            | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                            | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                    PixelFormat.TRANSLUCENT);
+            overlayLp.gravity = Gravity.TOP | Gravity.START;
+            overlayLp.x = 16;
+            overlayLp.y = 90;
+            wm.addView(overlayView, overlayLp);
+        } catch (Exception e) {
+            Log.e(TAG, "overlay init failed (权限?)", e);
+            overlayView = null;
+        }
     }
+
+    private void updateOverlay(String msg) {
+        if (overlayView != null) {
+            try {
+                overlayView.setText(msg);
+            } catch (Exception ignore) {
+            }
+        }
+    }
+
+    private void removeOverlay() {
+        if (wm != null && overlayView != null) {
+            try {
+                wm.removeView(overlayView);
+            } catch (Exception ignore) {
+            }
+            overlayView = null;
+        }
+    }
+
+    // ---------- 通知 ----------
 
     private void createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm != null) {
@@ -228,8 +321,8 @@ public class AutoSwipeService extends AccessibilityService {
         }
     }
 
-    /** 更新状态栏通知（诊断用，尽力而为，失败忽略）。 */
     private void postNotify(String msg) {
+        updateOverlay(msg);
         if (nm == null) return;
         try {
             Notification n = new Notification.Builder(this, CHANNEL_ID)
@@ -252,6 +345,7 @@ public class AutoSwipeService extends AccessibilityService {
     @Override
     public void onDestroy() {
         stopLoop();
+        removeOverlay();
         if (nm != null) {
             try { nm.cancel(NOTIF_ID); } catch (Exception ignore) {}
         }
